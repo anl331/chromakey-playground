@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { ChromaKeyVideo } from 'chromakey-video-react'
+import { LiveChromaKey } from './LiveChromaKey'
 import { motion, AnimatePresence } from 'motion/react'
 
 const CHECKERBOARD = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='10' height='10' fill='%23222'/%3E%3Crect x='10' y='10' width='10' height='10' fill='%23222'/%3E%3Crect x='10' width='10' height='10' fill='%23181818'/%3E%3Crect y='10' width='10' height='10' fill='%23181818'/%3E%3C/svg%3E")`
@@ -11,6 +11,16 @@ const PRESET_COLORS = [
   { hex: '#ff00ff', label: 'Magenta' },
 ]
 
+const BG_PRESETS = [
+  { value: 'checkerboard', label: 'Transparent' },
+  { value: '#ffffff', label: 'White' },
+  { value: '#000000', label: 'Black' },
+  { value: '#1a1a2e', label: 'Dark Navy' },
+  { value: '#0f3460', label: 'Deep Blue' },
+  { value: '#e94560', label: 'Coral' },
+  { value: 'custom', label: 'Custom' },
+]
+
 function App() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoName, setVideoName] = useState('')
@@ -19,9 +29,16 @@ function App() {
   const [similarity, setSimilarity] = useState(0.35)
   const [blend, setBlend] = useState(0.15)
   const [despill, setDespill] = useState(true)
+  const [chromaActive, setChromaActive] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [bgMode, setBgMode] = useState('checkerboard')
+  const [customBg, setCustomBg] = useState('#2d1b69')
   const [copied, setCopied] = useState(false)
+  const [eyedropper, setEyedropper] = useState(false)
+  const [hoveredColor, setHoveredColor] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoElRef = useRef<HTMLVideoElement | null>(null)
+  const samplerCanvas = useRef<HTMLCanvasElement | null>(null)
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('video/')) return
@@ -47,16 +64,61 @@ function App() {
     setIsDragging(false)
   }, [])
 
+  const sampleColorAt = (e: React.MouseEvent<HTMLDivElement>) => {
+    const video = videoElRef.current
+    if (!video || video.videoWidth === 0) return null
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const scaleX = video.videoWidth / rect.width
+    const scaleY = video.videoHeight / rect.height
+    const vx = Math.floor(x * scaleX)
+    const vy = Math.floor(y * scaleY)
+
+    if (!samplerCanvas.current) {
+      samplerCanvas.current = document.createElement('canvas')
+    }
+    const canvas = samplerCanvas.current
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(video, 0, 0)
+    const pixel = ctx.getImageData(vx, vy, 1, 1).data
+    const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(c => c.toString(16).padStart(2, '0')).join('')
+    return hex
+  }
+
+  const handlePreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!eyedropper) return
+    const hex = sampleColorAt(e)
+    if (hex) {
+      setColor(hex)
+      setChromaActive(true)
+      setEyedropper(false)
+      setHoveredColor(null)
+    }
+  }
+
+  const handlePreviewMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!eyedropper) return
+    const hex = sampleColorAt(e)
+    if (hex) setHoveredColor(hex)
+  }
+
+  const getPreviewBg = (): React.CSSProperties => {
+    if (!chromaActive || showOriginal) return { backgroundColor: '#111' }
+    if (bgMode === 'checkerboard') return { backgroundImage: CHECKERBOARD }
+    if (bgMode === 'custom') return { backgroundColor: customBg }
+    return { backgroundColor: bgMode }
+  }
+
   const generateCode = () => {
     const props: string[] = [`src="${videoName || 'your-video.mp4'}"`]
     if (color !== '#00ff00') props.push(`color="${color}"`)
     if (similarity !== 0.35) props.push(`similarity={${similarity}}`)
     if (blend !== 0.15) props.push(`blend={${blend}}`)
     if (!despill) props.push(`despill={false}`)
-
-    if (props.length <= 2) {
-      return `<ChromaKeyVideo\n  ${props.join('\n  ')}\n/>`
-    }
     return `<ChromaKeyVideo\n  ${props.join('\n  ')}\n/>`
   }
 
@@ -71,6 +133,8 @@ function App() {
     setSimilarity(0.35)
     setBlend(0.15)
     setDespill(true)
+    setBgMode('checkerboard')
+    setChromaActive(false)
   }
 
   useEffect(() => {
@@ -187,7 +251,6 @@ function App() {
       }}>
         <AnimatePresence mode="wait">
           {!videoUrl ? (
-            /* Drop Zone */
             <motion.div
               key="dropzone"
               initial={{ opacity: 0, y: 20 }}
@@ -240,7 +303,7 @@ function App() {
                   fontSize: 14,
                   color: 'var(--text-muted)',
                 }}>
-                  or click to browse — MP4, WebM, MOV
+                  or click to browse
                 </p>
               </div>
               <input
@@ -253,8 +316,6 @@ function App() {
                   if (file) handleFile(file)
                 }}
               />
-
-              {/* Install hint */}
               <div style={{
                 marginTop: 48,
                 padding: '16px 24px',
@@ -271,14 +332,13 @@ function App() {
               </div>
             </motion.div>
           ) : (
-            /* Editor */
             <motion.div
               key="editor"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, staggerChildren: 0.1 }}
+              transition={{ duration: 0.4 }}
             >
-              {/* Preview Area */}
+              {/* Preview + Controls */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 340px',
@@ -292,7 +352,6 @@ function App() {
                   borderRadius: 12,
                   overflow: 'hidden',
                 }}>
-                  {/* Preview Header */}
                   <div style={{
                     padding: '12px 16px',
                     borderBottom: '1px solid var(--border)',
@@ -300,32 +359,47 @@ function App() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{
-                        fontSize: 12,
-                        fontFamily: 'var(--font-mono)',
-                        color: 'var(--text-muted)',
-                      }}>
-                        {videoName}
-                      </span>
-                    </div>
+                    <span style={{
+                      fontSize: 12,
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--text-muted)',
+                    }}>
+                      {videoName}
+                    </span>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={() => setShowOriginal(!showOriginal)}
-                        style={{
+                      {!chromaActive && (
+                        <div style={{
                           fontSize: 12,
                           fontFamily: 'var(--font-mono)',
                           padding: '4px 10px',
                           borderRadius: 5,
-                          border: '1px solid var(--border)',
-                          background: showOriginal ? 'var(--accent-glow)' : 'transparent',
-                          color: showOriginal ? 'var(--accent)' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        {showOriginal ? 'showing original' : 'show original'}
-                      </button>
+                          background: 'var(--accent-glow)',
+                          color: 'var(--accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}>
+                          ← use eyedropper or pick a key color to start
+                        </div>
+                      )}
+                      {chromaActive && (
+                        <button
+                          onClick={() => setShowOriginal(!showOriginal)}
+                          style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            padding: '4px 10px',
+                            borderRadius: 5,
+                            border: '1px solid var(--border)',
+                            background: showOriginal ? 'var(--accent-glow)' : 'transparent',
+                            color: showOriginal ? 'var(--accent)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          {showOriginal ? 'showing original' : 'show original'}
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           if (videoUrl) URL.revokeObjectURL(videoUrl)
@@ -349,18 +423,24 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Video Canvas */}
-                  <div style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 400,
-                    backgroundImage: showOriginal ? 'none' : CHECKERBOARD,
-                    backgroundColor: showOriginal ? '#111' : 'transparent',
-                  }}>
-                    {showOriginal ? (
+                  <div
+                    onClick={handlePreviewClick}
+                    onMouseMove={handlePreviewMove}
+                    onMouseLeave={() => setHoveredColor(null)}
+                    style={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 400,
+                      transition: 'background-color 0.3s',
+                      cursor: eyedropper ? 'crosshair' : 'default',
+                      ...getPreviewBg(),
+                    }}
+                  >
+                    {(!chromaActive || showOriginal) ? (
                       <video
+                        ref={el => { if (el) videoElRef.current = el }}
                         src={videoUrl}
                         autoPlay
                         loop
@@ -373,15 +453,45 @@ function App() {
                         }}
                       />
                     ) : (
-                      <ChromaKeyVideo
-                        key={`${color}-${similarity}-${blend}-${despill}`}
+                      <LiveChromaKey
                         src={videoUrl}
                         color={color}
                         similarity={similarity}
                         blend={blend}
                         despill={despill}
                         className="preview-canvas"
+                        videoRef={videoElRef}
                       />
+                    )}
+                    {eyedropper && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 12,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        padding: '6px 14px',
+                        background: 'rgba(0,0,0,0.8)',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        pointerEvents: 'none',
+                        zIndex: 10,
+                      }}>
+                        {hoveredColor && (
+                          <div style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 3,
+                            background: hoveredColor,
+                            border: '1px solid rgba(255,255,255,0.3)',
+                          }} />
+                        )}
+                        {hoveredColor ? `click to select ${hoveredColor}` : 'click on the color to remove'}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -395,6 +505,7 @@ function App() {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 20,
+                  overflowY: 'auto',
                 }}>
                   <div style={{
                     display: 'flex',
@@ -442,7 +553,7 @@ function App() {
                       {PRESET_COLORS.map(p => (
                         <button
                           key={p.hex}
-                          onClick={() => setColor(p.hex)}
+                          onClick={() => { setColor(p.hex); setChromaActive(true) }}
                           title={p.label}
                           style={{
                             width: 32,
@@ -461,7 +572,7 @@ function App() {
                         <input
                           type="color"
                           value={color}
-                          onChange={e => setColor(e.target.value)}
+                          onChange={e => { setColor(e.target.value); setChromaActive(true) }}
                           style={{
                             width: 32,
                             height: 32,
@@ -475,11 +586,37 @@ function App() {
                       </div>
                     </div>
                     <div style={{
-                      fontSize: 12,
-                      fontFamily: 'var(--font-mono)',
-                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginTop: 2,
                     }}>
-                      {color}
+                      <button
+                        onClick={() => setEyedropper(!eyedropper)}
+                        style={{
+                          fontSize: 12,
+                          fontFamily: 'var(--font-mono)',
+                          padding: '4px 10px',
+                          borderRadius: 5,
+                          border: '1px solid var(--border)',
+                          background: eyedropper ? 'var(--accent-glow)' : 'transparent',
+                          color: eyedropper ? 'var(--accent)' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        💧 {eyedropper ? 'picking...' : 'eyedropper'}
+                      </button>
+                      <span style={{
+                        fontSize: 12,
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--text-muted)',
+                      }}>
+                        {color}
+                      </span>
                     </div>
                   </div>
 
@@ -551,6 +688,72 @@ function App() {
                     }}>
                       Remove color spill from edges
                     </p>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'var(--border)' }} />
+
+                  {/* Background Color */}
+                  <div>
+                    <label style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: 'var(--text-secondary)',
+                      display: 'block',
+                      marginBottom: 8,
+                    }}>
+                      Preview Background
+                    </label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {BG_PRESETS.map(p => (
+                        <button
+                          key={p.value}
+                          onClick={() => setBgMode(p.value)}
+                          title={p.label}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            border: bgMode === p.value
+                              ? '2px solid var(--accent)'
+                              : '2px solid var(--border)',
+                            background: p.value === 'checkerboard'
+                              ? CHECKERBOARD
+                              : p.value === 'custom'
+                              ? `conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)`
+                              : p.value,
+                            backgroundSize: p.value === 'checkerboard' ? '20px 20px' : undefined,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {bgMode === 'custom' && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={customBg}
+                          onChange={e => setCustomBg(e.target.value)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            border: '2px solid var(--border)',
+                            cursor: 'pointer',
+                            background: 'var(--bg-tertiary)',
+                            padding: 2,
+                          }}
+                        />
+                        <span style={{
+                          fontSize: 12,
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--text-muted)',
+                        }}>
+                          {customBg}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
