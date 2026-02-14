@@ -171,52 +171,166 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.2 }}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 24px 64px' }}
             >
+              {/* Hero */}
+              <div style={{ textAlign: 'center', maxWidth: 520, marginBottom: 40 }}>
+                <h2 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.03em', marginBottom: 10, lineHeight: 1.2 }}>
+                  Real-time green screen removal
+                </h2>
+                <p style={{ fontSize: 15, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                  Drop a video, pick the color to remove, fine-tune the settings, and copy the component code. Runs on the GPU via WebGL.
+                </p>
+              </div>
+
+              {/* Drop zone */}
               <div
                 onDrop={drop}
                 onDragOver={e => { e.preventDefault(); setDragging(true) }}
                 onDragLeave={() => setDragging(false)}
                 onClick={() => fileRef.current?.click()}
                 style={{
-                  width: 480,
-                  padding: '64px 48px',
+                  width: '100%',
+                  maxWidth: 480,
+                  padding: '48px 40px',
                   borderRadius: 16,
                   border: `1.5px dashed ${dragging ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
                   background: dragging ? 'var(--accent-soft)' : 'var(--bg-card)',
                   cursor: 'pointer',
                   transition: 'all 0.25s',
                   textAlign: 'center',
+                  marginBottom: 48,
                 }}
               >
                 <motion.div
                   animate={{ y: dragging ? -4 : 0 }}
-                  style={{ fontSize: 36, marginBottom: 16, opacity: dragging ? 1 : 0.4 }}
+                  style={{ fontSize: 36, marginBottom: 12, opacity: dragging ? 1 : 0.4 }}
                 >
                   🎬
                 </motion.div>
-                <p style={{ fontSize: 15, fontWeight: 500, color: dragging ? 'var(--accent)' : 'var(--text)', marginBottom: 6 }}>
+                <p style={{ fontSize: 15, fontWeight: 500, color: dragging ? 'var(--accent)' : 'var(--text)', marginBottom: 4 }}>
                   {dragging ? 'Drop it' : 'Drop a green screen video'}
                 </p>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                   or click to browse
                 </p>
-                <div style={{
-                  marginTop: 32,
-                  padding: '10px 16px',
-                  background: 'var(--bg)',
-                  borderRadius: 8,
-                  fontFamily: 'var(--mono)',
-                  fontSize: 12,
-                  color: 'var(--text-dim)',
-                  display: 'inline-block',
-                }}>
-                  <span style={{ color: 'var(--text-muted)' }}>$</span>{' '}
-                  <span style={{ color: 'var(--accent)' }}>npm i</span> chromakey-video-react
-                </div>
               </div>
               <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }}
                 onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} />
+
+              {/* Install & Usage */}
+              <div style={{ width: '100%', maxWidth: 560 }}>
+                {/* Install */}
+                <div style={{ marginBottom: 32 }}>
+                  <p style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                    Install
+                  </p>
+                  <div style={{
+                    padding: '12px 16px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    fontFamily: 'var(--mono)',
+                    fontSize: 13,
+                    color: 'var(--text-dim)',
+                  }}>
+                    <span style={{ color: 'var(--text-muted)' }}>$</span>{' '}
+                    <span style={{ color: 'var(--accent)' }}>npm install</span> chromakey-video-react
+                  </div>
+                </div>
+
+                {/* Usage */}
+                <div style={{ marginBottom: 32 }}>
+                  <p style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                    Usage
+                  </p>
+                  <pre style={{
+                    padding: '16px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    fontFamily: 'var(--mono)',
+                    fontSize: 12,
+                    lineHeight: 1.7,
+                    color: 'var(--text-dim)',
+                    overflow: 'auto',
+                    margin: 0,
+                  }}>
+{`import { ChromaKeyVideo } from 'chromakey-video-react';
+
+function App() {
+  return (
+    <ChromaKeyVideo
+      src="/your-video.mp4"
+      color="#00ff00"
+      similarity={0.35}
+      blend={0.15}
+    />
+  );
+}`}
+                  </pre>
+                </div>
+
+                {/* Props quick ref */}
+                <div style={{ marginBottom: 32 }}>
+                  <p style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                    Props
+                  </p>
+                  <div style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                  }}>
+                    {[
+                      { name: 'src', type: 'string', desc: 'Video source URL' },
+                      { name: 'color', type: 'string', def: '#00ff00', desc: 'Color to key out' },
+                      { name: 'similarity', type: 'number', def: '0.35', desc: 'Match aggressiveness (0-1)' },
+                      { name: 'blend', type: 'number', def: '0.15', desc: 'Edge blending range (0-1)' },
+                      { name: 'despill', type: 'boolean', def: 'true', desc: 'Remove color spill from edges' },
+                      { name: 'loop', type: 'boolean', def: 'true', desc: 'Loop the video' },
+                      { name: 'autoPlay', type: 'boolean', def: 'true', desc: 'Auto-play (always muted)' },
+                      { name: 'className', type: 'string', desc: 'CSS class for the canvas' },
+                    ].map((p, i) => (
+                      <div key={p.name} style={{
+                        padding: '10px 16px',
+                        display: 'flex',
+                        gap: 12,
+                        alignItems: 'baseline',
+                        borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                        fontSize: 12,
+                      }}>
+                        <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)', minWidth: 80 }}>{p.name}</span>
+                        <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-muted)', minWidth: 56, fontSize: 11 }}>{p.type}</span>
+                        <span style={{ color: 'var(--text-dim)', flex: 1 }}>
+                          {p.desc}
+                          {p.def && <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>({p.def})</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Links */}
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                  <a href="https://github.com/anl331/chromakey-video-react" target="_blank" rel="noopener" style={{
+                    fontSize: 13, color: 'var(--text-dim)', textDecoration: 'none',
+                    padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                    transition: 'all 0.15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-active)'; e.currentTarget.style.color = 'var(--text)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-dim)' }}
+                  >GitHub</a>
+                  <a href="https://www.npmjs.com/package/chromakey-video-react" target="_blank" rel="noopener" style={{
+                    fontSize: 13, color: 'var(--text-dim)', textDecoration: 'none',
+                    padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
+                    transition: 'all 0.15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-active)'; e.currentTarget.style.color = 'var(--text)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-dim)' }}
+                  >npm</a>
+                </div>
+              </div>
             </motion.div>
           ) : (
             /* ─── Editor ─── */
