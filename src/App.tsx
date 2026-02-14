@@ -548,6 +548,9 @@ function App() {
       }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
           built by{' '}
+          <a href="https://alfredonatal.com" target="_blank" rel="noopener"
+            style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Alfredo Natal</a>
+          {' · '}
           <a href="https://x.com/_itsanl" target="_blank" rel="noopener"
             style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>@_itsanl</a>
         </span>
