@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type RefObject } from 'react'
+import { useEffect, useRef, useCallback, type RefObject } from 'react'
 
 interface Props {
   videoRef: RefObject<HTMLVideoElement | null>
@@ -7,8 +7,6 @@ interface Props {
 }
 
 export function Eyedropper({ videoRef, onPick, onCancel }: Props) {
-  const [pos, setPos] = useState<[number, number] | null>(null)
-  const [hex, setHex] = useState<string | null>(null)
   const cRef = useRef<HTMLCanvasElement>(document.createElement('canvas'))
   const mountedRef = useRef(true)
   const labelRef = useRef<HTMLDivElement | null>(null)
